@@ -1,0 +1,11 @@
+{
+    "name": "hono-devcontainer",
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:18",
+    "customizations": {
+      "vscode": {
+        "extensions": [
+            "mhutchie.git-graph"
+        ]
+      }
+    }
+  }
