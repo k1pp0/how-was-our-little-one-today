@@ -38,10 +38,12 @@ app.post('/', async(c) => {
     const token: string = c.env.SLACK_BOT_USER_OAUTH_TOKEN
     const channelId: string = req.event.channel
     const threadTs: string = req.event.thread_ts || req.event.ts
+    const botUser: string = req.event.text.match(/<@([A-Z0-9]+)>/)[1]
 
     const messages = await slackConversationsReplies(
       token, channelId, threadTs
     )
+    const messageText: string = messages.filter((message) => message.user != botUser && !message.text.includes(botUser)).sort((a, b) => a.ts.localeCompare(b.ts)).map((message) => message.text).join(',')
 
     await slackChatPostMessage(
       token, channelId, threadTs, `hello: ${messages.length}`
