@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
 
 type Bindings = {
-  SLACK_BOT_USER_OAUTH_TOKEN: string
+  SLACK_BOT_USER_OAUTH_TOKEN: string,
+  OPENAI_API_SECRET_KEY: string,
+  OPENAI_API_ENDPOINT: string,
 }
 const app = new Hono<{ Bindings: Bindings }>()
 
@@ -27,6 +29,30 @@ interface SlackConversationsRepliesResponse {
   }
 }
 
+interface AiChatCompletionsResponse {
+  id: string;
+  model: string;
+  created: number;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number; 
+    total_tokens: number;
+  };
+  object: string;
+  choices: {
+    index: number;
+    finish_reason: string;
+    message: {
+      role: string;
+      content: string;
+    };
+    delta: {
+      role: string;
+      content: string;  
+    };
+  }[];
+}
+
 app.post('/', async(c) => {
   const req = await c.req.json()
 
@@ -35,18 +61,27 @@ app.post('/', async(c) => {
   }
 
   if (req.event.type === 'app_mention') {
+    // slack info
     const token: string = c.env.SLACK_BOT_USER_OAUTH_TOKEN
     const channelId: string = req.event.channel
     const threadTs: string = req.event.thread_ts || req.event.ts
     const botUser: string = req.event.text.match(/<@([A-Z0-9]+)>/)[1]
+    // openai info
+    const apiKey: string = c.env.OPENAI_API_SECRET_KEY
+    const endPoint: string = c.env.OPENAI_API_ENDPOINT
 
     const messages = await slackConversationsReplies(
       token, channelId, threadTs
     )
     const messageText: string = messages.filter((message) => message.user != botUser && !message.text.includes(botUser)).sort((a, b) => a.ts.localeCompare(b.ts)).map((message) => message.text).join(',')
-
+  
+    const prompt: string = 'translate english'
+    const resultText = await aiChatCompletions(
+      apiKey, endPoint, messageText, prompt,
+    )
+  
     await slackChatPostMessage(
-      token, channelId, threadTs, `hello: ${messages.length}`
+      token, channelId, threadTs, `hello: ${messages.length}, ${resultText}`
     )
 
     return c.text("ok")
@@ -82,4 +117,24 @@ async function slackConversationsReplies(token: string, channelId: string, threa
   })
   const data: SlackConversationsRepliesResponse = await response.json()
   return data.messages
+}
+
+async function aiChatCompletions(apiKey: string, endPoint: string, messageText: string, prompt: string): Promise<string> {
+  const params = {
+    model: 'gpt-3.5-turbo',
+    messages: [
+      {role: 'system', content: prompt},
+      {role: 'user', content: messageText},
+    ]
+  }
+  const response = await fetch(`${endPoint}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(params),
+  })
+  const data: AiChatCompletionsResponse = await response.json()
+  return data.choices[0].message.content
 }
