@@ -70,25 +70,31 @@ app.post('/', async(c) => {
     const apiKey: string = c.env.OPENAI_API_SECRET_KEY
     const endPoint: string = c.env.OPENAI_API_ENDPOINT
 
-    const messages = await slackConversationsReplies(
-      token, channelId, threadTs
-    )
-    const messageText: string = messages.filter((message) => message.user != botUser && !message.text.includes(botUser)).sort((a, b) => a.ts.localeCompare(b.ts)).map((message) => message.text).join(',')
-  
-    const prompt: string = 'translate english'
-    const resultText = await aiChatCompletions(
-      apiKey, endPoint, messageText, prompt,
-    )
-  
-    await slackChatPostMessage(
-      token, channelId, threadTs, `hello: ${messages.length}, ${resultText}`
-    )
+    // main logic
+    c.executionCtx.waitUntil(main(token, channelId, threadTs, botUser, apiKey, endPoint))
 
     return c.text("ok")
   }
 })
 
 export default app
+
+async function main(token: string, channelId: string, threadTs: string, botUser: string, apiKey: string, endPoint: string): Promise<void> {
+  const messages = await slackConversationsReplies(
+    token, channelId, threadTs
+  )
+  const messageText: string = messages.filter((message) => message.user != botUser && !message.text.includes(botUser)).sort((a, b) => a.ts.localeCompare(b.ts)).map((message) => message.text).join(',')
+
+  const prompt: string = 'translate english'
+  const resultText = await aiChatCompletions(
+    apiKey, endPoint, messageText, prompt,
+  )
+
+  await slackChatPostMessage(
+    token, channelId, threadTs, `hello: ${messages.length}, ${resultText}`
+  )
+
+}
 
 async function slackChatPostMessage(token: string, channelId: string, threadTs: string, text: string){
   const url = 'https://slack.com/api/chat.postMessage'
