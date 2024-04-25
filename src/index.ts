@@ -4,6 +4,7 @@ type Bindings = {
 	SLACK_BOT_USER_OAUTH_TOKEN: string;
 	OPENAI_API_SECRET_KEY: string;
 	OPENAI_API_ENDPOINT: string;
+	PROMPT: string;
 };
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -69,10 +70,11 @@ app.post("/", async (c) => {
 		// openai info
 		const apiKey: string = c.env.OPENAI_API_SECRET_KEY;
 		const endPoint: string = c.env.OPENAI_API_ENDPOINT;
+		const prompt: string = c.env.PROMPT;
 
 		// main logic
 		c.executionCtx.waitUntil(
-			main(token, channelId, threadTs, botUser, apiKey, endPoint),
+			main(token, channelId, threadTs, botUser, apiKey, endPoint, prompt),
 		);
 
 		return c.text("ok");
@@ -88,6 +90,7 @@ async function main(
 	botUser: string,
 	apiKey: string,
 	endPoint: string,
+	prompt: string,
 ): Promise<void> {
 	const messages = await slackConversationsReplies(token, channelId, threadTs);
 	const messageText: string = messages
@@ -98,7 +101,6 @@ async function main(
 		.map((message) => message.text)
 		.join(",");
 
-	const prompt: string = "translate english";
 	const resultText = await aiChatCompletions(
 		apiKey,
 		endPoint,
@@ -106,12 +108,7 @@ async function main(
 		prompt,
 	);
 
-	await slackChatPostMessage(
-		token,
-		channelId,
-		threadTs,
-		`hello: ${messages.length}, ${resultText}`,
-	);
+	await slackChatPostMessage(token, channelId, threadTs, resultText);
 }
 
 async function slackChatPostMessage(
